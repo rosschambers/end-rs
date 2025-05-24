@@ -178,7 +178,6 @@ pub fn eww_create_history_value(cfg: &Config, history: &HashMap<u32, HistoryNoti
     history_text.push_str(&cfg.notification_orientation);
     history_text.push_str("\" ");
 
-    let history = history.values();
 
     for hist in history {
         // NOTE: Keeping this as a comment for future reference in case eww_val! is not working
@@ -187,12 +186,13 @@ pub fn eww_create_history_value(cfg: &Config, history: &HashMap<u32, HistoryNoti
             "(box ({} :history `{}`))",
             cfg.eww_history_widget,
             eww_val!({
-                "app_name": hist.app_name,
-                "body": hist.body,
-                "icon": hist.icon,
-                "app_icon": hist.app_icon,
-                "summary": hist.summary,
-                "urgency": hist.urgency
+                "id": hist.0,
+                "app_name": hist.1.app_name,
+                "body": hist.1.body,
+                "icon": hist.1.icon,
+                "app_icon": hist.1.app_icon,
+                "summary": hist.1.summary,
+                "urgency": hist.1.urgency
             })
         );
         history_text.push_str(&widget_string);
