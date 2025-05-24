@@ -42,7 +42,7 @@ pub struct HistoryNotification {
 pub struct NotificationDaemon {
     pub config: Arc<Config>,
     pub notifications: Arc<Mutex<HashMap<u32, Notification>>>,
-    pub notifications_history: Arc<RwLock<Vec<HistoryNotification>>>,
+    pub notifications_history: Arc<RwLock<HashMap<u32, HistoryNotification>>>,
     pub connection: zbus::Connection,
     pub next_id: u32,
 }
@@ -146,11 +146,14 @@ impl NotificationDaemon {
                 urgency: urgency_str.to_string(),
             };
             let mut notifications_history = self.notifications_history.write().await;
-            notifications_history.push(history_notification);
+            notifications_history.insert(id, history_notification);
             log!("Updated history");
             // Release the lock before updating the notifications
             if notifications_history.len() > self.config.max_notifications as usize {
-                notifications_history.remove(0);
+                // Remove the oldest entry if we exceed the max notifications limit
+                if let Some(oldest_id) = notifications_history.keys().min().copied() {
+                    notifications_history.remove(&oldest_id);
+                }
             }
 
             drop(notifications_history);
@@ -212,6 +215,17 @@ impl NotificationDaemon {
                 if notifications.is_empty() {
                     eww_close_notifications(&self.config);
                 }
+                
+                // Also remove from history if it exists there
+                let mut history = self.notifications_history.write().await;
+                history.remove(&id);
+                drop(history);
+                
+                // Update history display if needed
+                if self.config.update_history {
+                    self.update_history().await?;
+                }
+                
                 let dest: Option<&str> = None;
                 self.connection
                     .emit_signal(

@@ -173,12 +173,12 @@ pub fn eww_close_notifications(cfg: &Config) {
     }
 }
 
-pub fn eww_create_history_value(cfg: &Config, history: &[HistoryNotification]) -> String {
+pub fn eww_create_history_value(cfg: &Config, history: &HashMap<u32, HistoryNotification>) -> String {
     let mut history_text = "(box :space-evenly false :orientation \"".to_string();
     history_text.push_str(&cfg.notification_orientation);
     history_text.push_str("\" ");
 
-    let history = history.iter().rev();
+    let history = history.values();
 
     for hist in history {
         // NOTE: Keeping this as a comment for future reference in case eww_val! is not working
@@ -201,12 +201,12 @@ pub fn eww_create_history_value(cfg: &Config, history: &[HistoryNotification]) -
     history_text
 }
 
-pub fn eww_update_history(cfg: &Config, history: &[HistoryNotification]) {
+pub fn eww_update_history(cfg: &Config, history: &HashMap<u32, HistoryNotification>) {
     let widgets = eww_create_history_value(cfg, history);
     eww_update_value(cfg, &cfg.eww_history_var, &widgets);
 }
 
-pub fn eww_update_and_open_history(cfg: &Config, history: &[HistoryNotification]) {
+pub fn eww_update_and_open_history(cfg: &Config, history: &HashMap<u32, HistoryNotification>) {
     eww_update_history(cfg, history);
     let _res = eww_open_window(cfg, &cfg.eww_history_window);
 }
@@ -215,7 +215,7 @@ pub fn eww_close_history(cfg: &Config) {
     let _res = eww_close_window(cfg, &cfg.eww_history_window);
 }
 
-pub fn eww_toggle_history(cfg: &Config, history: &[HistoryNotification]) {
+pub fn eww_toggle_history(cfg: &Config, history: &HashMap<u32, HistoryNotification>) {
     let widgets = eww_create_history_value(cfg, history);
     eww_update_value(cfg, &cfg.eww_history_var, &widgets);
     let _res = eww_toggle_window(cfg, &cfg.eww_history_window);
