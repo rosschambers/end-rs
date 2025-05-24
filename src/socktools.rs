@@ -17,8 +17,6 @@ use crate::notifdaemon::NotificationDaemon;
 #[derive(Serialize, Deserialize)]
 enum DaemonActions {
     CloseNotification(u32),
-    CloseNotificationByEndRsId(String),
-    RemoveHistoryNotificationByEndRsId(String),
     OpenHistory,
     CloseHistory,
     ToggleHistory,
@@ -88,11 +86,6 @@ pub async fn run_daemon(cfg: Config) -> Result<()> {
                     iface.close_notification(id).await.unwrap();
                     log!("Notification {} closed", id);
                 }
-                DaemonActions::CloseNotificationByEndRsId(end_rs_id) => {
-                    log!("Closing notification with end_rs_id {}", end_rs_id);
-                    iface.close_notification_by_end_rs_id(&end_rs_id).await.unwrap();
-                    log!("Notification with end_rs_id {} closed", end_rs_id);
-                }
                 DaemonActions::OpenHistory => {
                     log!("Opening notification history");
                     iface.open_history().await.unwrap();
@@ -102,11 +95,6 @@ pub async fn run_daemon(cfg: Config) -> Result<()> {
                     log!("Closing notification history");
                     iface.close_history().await.unwrap();
                     log!("Notification history closed");
-                }
-                DaemonActions::RemoveHistoryNotificationByEndRsId(end_rs_id) => {
-                    log!("Removing history notification with end_rs_id {}", end_rs_id);
-                    iface.remove_history_notification_by_end_rs_id(&end_rs_id).await.unwrap();
-                    log!("History notification with end_rs_id {} removed", end_rs_id);
                 }
                 DaemonActions::ToggleHistory => {
                     log!("Toggling notification history");
@@ -212,12 +200,7 @@ pub async fn send_message(args: Vec<String>) -> Result<()> {
                         "Invalid command to close".to_string(),
                     ));
                 }
-                // If the ID is a number, use the numeric ID, otherwise use the end_rs_id
-                if let Ok(id) = args[1].parse::<u32>() {
-                    DaemonActions::CloseNotification(id)
-                } else {
-                    DaemonActions::CloseNotificationByEndRsId(args[1].clone())
-                }
+                DaemonActions::CloseNotification(args[1].parse::<u32>().unwrap())
             }
             "history" => {
                 if args.len() < 2 {
@@ -227,14 +210,7 @@ pub async fn send_message(args: Vec<String>) -> Result<()> {
                 }
                 match args[1].as_str() {
                     "open" => DaemonActions::OpenHistory,
-                    "close" => {
-                        if args.len() < 3 {
-                            DaemonActions::CloseHistory
-                        } else {
-                            // If a history notification ID is provided, remove it
-                            DaemonActions::RemoveHistoryNotificationByEndRsId(args[2].clone())
-                        }
-                    },
+                    "close" => DaemonActions::CloseHistory,
                     "toggle" => DaemonActions::ToggleHistory,
                     _ => {
                         return Err(zbus::fdo::Error::Failed("Invalid command".to_string()));

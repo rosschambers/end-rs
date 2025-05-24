@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use zbus::fdo::Result;
@@ -30,7 +28,6 @@ pub struct Notification {
     pub actions: Vec<(String, String)>,
     pub timeout_cancelled: bool,
     pub timeout_future: Option<JoinHandle<()>>,
-    pub end_rs_id: String,
 }
 
 pub struct HistoryNotification {
@@ -40,7 +37,6 @@ pub struct HistoryNotification {
     pub summary: String,
     pub body: String,
     pub urgency: String,
-    pub end_rs_id: String,
 }
 
 pub struct NotificationDaemon {
@@ -49,15 +45,6 @@ pub struct NotificationDaemon {
     pub notifications_history: Arc<RwLock<Vec<HistoryNotification>>>,
     pub connection: zbus::Connection,
     pub next_id: u32,
-}
-
-// Function to generate a unique hash ID for a notification
-fn generate_notification_hash(app_name: &str, summary: &str, body: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    app_name.hash(&mut hasher);
-    summary.hash(&mut hasher);
-    body.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
 }
 
 #[interface(name = "org.freedesktop.Notifications")]
@@ -150,9 +137,6 @@ impl NotificationDaemon {
 
         if !is_transient {
             log!("Notification is not transient");
-            let end_rs_id = generate_notification_hash(app_name, summary, body);
-            log!("Generated end_rs_id: {}", end_rs_id);
-            
             let history_notification = HistoryNotification {
                 app_name: app_name.to_string(),
                 icon: icon.clone(),
@@ -160,7 +144,6 @@ impl NotificationDaemon {
                 summary: summary.to_string(),
                 body: body.to_string(),
                 urgency: urgency_str.to_string(),
-                end_rs_id: end_rs_id.clone(),
             };
             let mut notifications_history = self.notifications_history.write().await;
             notifications_history.push(history_notification);
@@ -199,7 +182,6 @@ impl NotificationDaemon {
             }));
         }
 
-        let end_rs_id = generate_notification_hash(app_name, summary, body);
         let notification = Notification {
             app_name: app_name.to_string(),
             icon: icon.clone(),
@@ -210,7 +192,6 @@ impl NotificationDaemon {
             urgency: urgency_str.to_string(),
             timeout_cancelled: false,
             timeout_future: join_handle,
-            end_rs_id,
         };
 
         let notifications = self.notifications.try_lock();
@@ -246,43 +227,6 @@ impl NotificationDaemon {
         }
         Ok(())
     }
-    
-    pub async fn close_notification_by_end_rs_id(&self, end_rs_id: &str) -> Result<()> {
-        let notifications = self.notifications.try_lock();
-        if let Ok(mut notifications) = notifications {
-            // Find the notification with the given end_rs_id
-            let mut id_to_remove = None;
-            for (id, notification) in notifications.iter() {
-                if &notification.end_rs_id == end_rs_id {
-                    id_to_remove = Some(*id);
-                    break;
-                }
-            }
-            
-            // If found, remove it
-            if let Some(id) = id_to_remove {
-                if notifications.remove(&id).is_some() {
-                    println!("Notification with end_rs_id {} closed", end_rs_id);
-                    eww_update_notifications(&self.config, &notifications);
-                    if notifications.is_empty() {
-                        eww_close_notifications(&self.config);
-                    }
-                    let dest: Option<&str> = None;
-                    self.connection
-                        .emit_signal(
-                            dest,
-                            "/org/freedesktop/Notifications",
-                            "org.freedesktop.Notifications",
-                            "NotificationClosed",
-                            &(id, 3_u32),
-                        )
-                        .await
-                        .unwrap();
-                }
-            }
-        }
-        Ok(())
-    }
 
     pub fn get_capabilities(&self) -> Vec<String> {
         vec!["body".to_string(), "actions".to_string()]
@@ -313,28 +257,6 @@ impl NotificationDaemon {
     pub async fn close_history(&self) -> Result<()> {
         println!("Closing history");
         eww_close_history(&self.config);
-        Ok(())
-    }
-    
-    pub async fn remove_history_notification_by_end_rs_id(&self, end_rs_id: &str) -> Result<()> {
-        let mut history = self.notifications_history.write().await;
-        let initial_len = history.len();
-        
-        // Filter out the notification with the matching end_rs_id
-        history.retain(|notification| notification.end_rs_id != end_rs_id);
-        
-        let was_removed = history.len() < initial_len;
-        if was_removed {
-            println!("History notification with end_rs_id {} removed", end_rs_id);
-            // Update the displayed history if it was open
-            drop(history);
-            if self.config.update_history {
-                self.update_history().await?
-            }
-        } else {
-            println!("No history notification found with end_rs_id {}", end_rs_id);
-        }
-        
         Ok(())
     }
 

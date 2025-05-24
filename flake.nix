@@ -12,27 +12,6 @@
       packages = forAllSystems (system: {
         default = pkgsFor.${system}.callPackage ./. { };
       });
-      
-      devShells = forAllSystems (system: 
-        let 
-          pkgs = pkgsFor.${system};
-        in {
-          default = pkgs.mkShell {
-            buildInputs = with pkgs; [
-              rustc
-              cargo
-              rustfmt
-              rust-analyzer
-              clippy
-              libiconv
-              pkg-config
-            ];
-            
-            # Environment variables
-            RUSTC_BOOTSTRAP = 1;
-          };
-        }
-      );
     };
 }
 
