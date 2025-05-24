@@ -17,8 +17,8 @@ fn print_help() {
     println!("  -v, --version - Print version information");
     println!("Commands:");
     println!("  daemon - Start the notification daemon");
-    println!("  close <id> - Close a notification with the given ID");
-    println!("  history <open|close|toggle> - Open, close or toggle the notification history");
+    println!("  close <id|end_rs_id> - Close a notification with the given ID or internal end_rs_id");
+    println!("  history <open|close|toggle> [end_rs_id] - Open, close or toggle the notification history. Optionally remove a specific notification by end_rs_id");
     println!("  action <id> <action> - Perform an action on a notification with the given ID");
     println!();
     println!("  generate [css|yuck|all] - Generate the eww config files");
